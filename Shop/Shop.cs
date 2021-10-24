@@ -6,6 +6,7 @@ using System.Data;
 using System.IO;
 using System.Text;
 using System.Net;
+using Microsoft.Xna.Framework;
 
 // Terraria related API References
 using Mono.Data.Sqlite;
@@ -25,7 +26,7 @@ using Wolfje.Plugins.SEconomy.Journal;
 
 namespace Shop
 {
-    [ApiVersion(1, 16)]
+    [ApiVersion(2, 1)]
     public class Shop : TerrariaPlugin
     {
         internal ShopData ShopList;
@@ -74,18 +75,18 @@ namespace Shop
 
         private void OnInitialize(EventArgs args)
         {
-            switch (TShock.Config.StorageType.ToLower())
+            switch (TShock.Config.Settings.StorageType.ToLower())
             {
                 case "mysql":
-                    string[] host = TShock.Config.MySqlHost.Split(':');
+                    string[] host = TShock.Config.Settings.MySqlHost.Split(':');
                     Database = new MySqlConnection()
                     {
                         ConnectionString = string.Format("Server={0}; Port={1}; Database={2}; Uid={3}; Pwd={4};",
                         host[0],
                         host.Length == 1 ? "3306" : host[1],
-                        TShock.Config.MySqlDbName,
-                        TShock.Config.MySqlUsername,
-                        TShock.Config.MySqlPassword)
+                        TShock.Config.Settings.MySqlDbName,
+                        TShock.Config.Settings.MySqlUsername,
+                        TShock.Config.Settings.MySqlPassword)
 
                     };
                     break;
@@ -103,7 +104,7 @@ namespace Shop
                     break;
             }
             SqlTableCreator sqlcreator = new SqlTableCreator(Database, Database.GetSqlType() == SqlType.Sqlite ? (IQueryBuilder)new SqliteQueryCreator() : new MysqlQueryCreator());
-            sqlcreator.EnsureExists(new SqlTable("storeshop",
+            sqlcreator.EnsureTableStructure(new SqlTable("storeshop",
                 new SqlColumn("name", MySqlDbType.VarChar) { Primary = true, Length = 30 },
                 new SqlColumn("price", MySqlDbType.Int32) { DefaultValue = "1", NotNull = true },
                 new SqlColumn("region", MySqlDbType.VarChar) { DefaultValue = "", Length = 30, NotNull = true },
@@ -113,7 +114,7 @@ namespace Shop
                 new SqlColumn("onsale", MySqlDbType.VarChar) { DefaultValue = "", Length = 30, NotNull = true },
                 new SqlColumn("maxstock", MySqlDbType.Int32) { DefaultValue = "-1", Length = 30, NotNull = true }
                 ));
-            sqlcreator.EnsureExists(new SqlTable("storetrade",
+            sqlcreator.EnsureTableStructure(new SqlTable("storetrade",
                 new SqlColumn("ID", MySqlDbType.Int32) { Primary = true},
                 new SqlColumn("User", MySqlDbType.VarChar) { Length = 30 },
                 new SqlColumn("ItemID", MySqlDbType.Int32),
@@ -122,7 +123,7 @@ namespace Shop
                 new SqlColumn("WStack", MySqlDbType.Int32),
                 new SqlColumn("Active", MySqlDbType.Int32)
                 ));
-            sqlcreator.EnsureExists(new SqlTable("storeoffer",
+            sqlcreator.EnsureTableStructure(new SqlTable("storeoffer",
                 new SqlColumn("ID", MySqlDbType.Int32) { Primary = true },
                 new SqlColumn("User", MySqlDbType.VarChar) { Length = 30 },
                 new SqlColumn("ItemID", MySqlDbType.Int32),
@@ -198,15 +199,15 @@ namespace Shop
                                     args.TPlayer.inventory[i].stack -= stack;
                                 }
                                 TradeList.processOffer(args.Player, id, item.netID, stack);
-                                NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, "", args.Player.Index, i);
-                                NetMessage.SendData((int)PacketTypes.PlayerSlot, args.Player.Index, -1, "", args.Player.Index, i);
-                                args.Player.SendInfoMessage("Sucess: Offer Completed Successfully! You have offered {0} of {1} on TradeID {2}.", stack, item.name, id);
+                                NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, i);
+                                NetMessage.SendData((int)PacketTypes.PlayerSlot, args.Player.Index, -1, null, args.Player.Index, i);
+                                args.Player.SendInfoMessage("Sucess: Offer Completed Successfully! You have offered {0} of {1} on TradeID {2}.", stack, item.Name, id);
                                 return;
                             }
                         }
                     }
                     args.Player.SendErrorMessage("Error: Adding Trade could not be completed, you do not have that item to Trade, or do not have enough stacks in one pile!");
-                    args.Player.SendErrorMessage("Error: Offered Item - {0}", item.name);
+                    args.Player.SendErrorMessage("Error: Offered Item - {0}", item.Name);
                     return;
                 }
             }
@@ -256,11 +257,11 @@ namespace Shop
                         //all conditions met, delete item and add offer entry.   
                         args.TPlayer.inventory[i].SetDefaults(oObj.ItemID);
                         args.TPlayer.inventory[i].stack = oObj.Stack;
-                        NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, "", args.Player.Index, i);
-                        NetMessage.SendData((int)PacketTypes.PlayerSlot, args.Player.Index, -1, "", args.Player.Index, i);
+                        NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, i);
+                        NetMessage.SendData((int)PacketTypes.PlayerSlot, args.Player.Index, -1, null, args.Player.Index, i);
                         int tradeID = oObj.Type;
                         TradeList.processAccept(args.Player, oObj);
-                        args.Player.SendInfoMessage("Sucess: Item Collected! You have Gained {0} of {1}.", oObj.Stack, TShock.Utils.GetItemById(oObj.ItemID).name);
+                        args.Player.SendInfoMessage("Sucess: Item Collected! You have Gained {0} of {1}.", oObj.Stack, TShock.Utils.GetItemById(oObj.ItemID).Name);
                         recived = true;
                         //remove all other offers and return to owner
                         foreach (OfferObj obj in TradeList.offerObj)
@@ -307,7 +308,7 @@ namespace Shop
                     foreach (OfferObj obj in TradeList.offerObj)
                     {
                         if (obj.Type == id && obj.Active == 1)
-                            args.Player.SendInfoMessage("{0} - {1} - {2}:{3}", obj.ID, obj.User, TShock.Utils.GetItemById(obj.ItemID).name, obj.Stack);
+                            args.Player.SendInfoMessage("{0} - {1} - {2}:{3}", obj.ID, obj.User, TShock.Utils.GetItemById(obj.ItemID).Name, obj.Stack);
                     }
                     return;
                 }
@@ -426,16 +427,16 @@ namespace Shop
                                 {
                                     args.TPlayer.inventory[i].stack -= stack;
                                 }
-                                NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, "", args.Player.Index, i);
-                                NetMessage.SendData((int)PacketTypes.PlayerSlot, args.Player.Index, -1, "", args.Player.Index, i);
+                                NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, i);
+                                NetMessage.SendData((int)PacketTypes.PlayerSlot, args.Player.Index, -1, null, args.Player.Index, i);
                                 AddTrade(args.Player, item, stack);
-                                args.Player.SendInfoMessage("Sucess: Add Trade Successfully! You have Added {0} {1}(s).", stack, item.name);
+                                args.Player.SendInfoMessage("Sucess: Add Trade Successfully! You have Added {0} {1}(s).", stack, item.Name);
                                 return;
                             }
                         }
                     }
                     args.Player.SendErrorMessage("Error: Adding Trade could not be completed, you do not have that item to Trade, or do not have enough stacks in one pile!");
-                    args.Player.SendErrorMessage("Error: Trade Item - {0}", item.name);
+                    args.Player.SendErrorMessage("Error: Trade Item - {0}", item.Name);
                     return;
                 }
                 //trade add (item) (amount) (currency) - 1 to currency trade
@@ -494,15 +495,15 @@ namespace Shop
                                 {
                                     args.TPlayer.inventory[i].stack -= stack;
                                 }
-                                NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, "", args.Player.Index, i);
-                                NetMessage.SendData((int)PacketTypes.PlayerSlot, args.Player.Index, -1, "", args.Player.Index, i);
-                                args.Player.SendInfoMessage("Sucess: Adding Trade Completed Successfully! You are Trading {0} of {1} for {2}.", stack, item.name, ((Money)money).ToLongString());
+                                NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, i);
+                                NetMessage.SendData((int)PacketTypes.PlayerSlot, args.Player.Index, -1, null, args.Player.Index, i);
+                                args.Player.SendInfoMessage("Sucess: Adding Trade Completed Successfully! You are Trading {0} of {1} for {2}.", stack, item.Name, ((Money)money).ToLongString());
                                 return;
                             }
                         }
                     }
                     args.Player.SendErrorMessage("Error: Offer could not be completed, you do not have that item to offer, or not enough stacks in one pile!");
-                    args.Player.SendErrorMessage("Error: Offered Item - {0}", item.name);
+                    args.Player.SendErrorMessage("Error: Offered Item - {0}", item.Name);
                     return;        
                 }
                 //Trading with maximum required amount of args
@@ -561,17 +562,17 @@ namespace Shop
                                 {
                                     args.TPlayer.inventory[i].stack -= stack;
                                 }
-                                NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, "", args.Player.Index, i);
-                                NetMessage.SendData((int)PacketTypes.PlayerSlot, args.Player.Index, -1, "", args.Player.Index, i);
+                                NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, i);
+                                NetMessage.SendData((int)PacketTypes.PlayerSlot, args.Player.Index, -1, null, args.Player.Index, i);
                                 AddTrade(args.Player, item, stack, witem, wstack);
-                                args.Player.SendInfoMessage("Sucess: Add Trade Successfully! You have Added {0} {1}(s).", stack, item.name);
-                                args.Player.SendInfoMessage("Sucess: Trading for {0} {1}(s).", wstack, witem.name);
+                                args.Player.SendInfoMessage("Sucess: Add Trade Successfully! You have Added {0} {1}(s).", stack, item.Name);
+                                args.Player.SendInfoMessage("Sucess: Trading for {0} {1}(s).", wstack, witem.Name);
                                 return;
                             }
                         }
                     }
                     args.Player.SendErrorMessage("Error: Offer could not be completed, you do not have that item to offer, or not enough stacks in one pile!");
-                    args.Player.SendErrorMessage("Error: Offered Item - {0}", item.name);
+                    args.Player.SendErrorMessage("Error: Offered Item - {0}", item.Name);
                     return;
                 }
             }
@@ -626,7 +627,7 @@ namespace Shop
                             }
                             else
                             {
-                                item = TShock.Utils.GetItemById(obj.ItemID).name;
+                                item = TShock.Utils.GetItemById(obj.ItemID).Name;
                             }
 
                             if (obj.WItemID == 0)
@@ -635,7 +636,7 @@ namespace Shop
                             }
                             else
                             {
-                                witem = TShock.Utils.GetItemById(obj.WItemID).name;
+                                witem = TShock.Utils.GetItemById(obj.WItemID).Name;
                             }
                             args.Player.SendInfoMessage("{0} - {1} - {2}:{3} - {4}:{5}", obj.ID, obj.User, item, obj.Stack, witem, obj.WStack);
                             sent++;
@@ -710,9 +711,9 @@ namespace Shop
                                     //all conditions met, delete witem and replace with item as the prize                                   
                                     args.TPlayer.inventory[i].SetDefaults(obj.ItemID);
                                     args.TPlayer.inventory[i].stack = obj.Stack;
-                                    NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, "", args.Player.Index, i);
-                                    NetMessage.SendData((int)PacketTypes.PlayerSlot, args.Player.Index, -1, "", args.Player.Index, i);
-                                    args.Player.SendInfoMessage("Sucess: Trade Completed Successfully! You have gained {0} of {1} for {2} of {3}.", obj.Stack, TShock.Utils.GetItemById(obj.ItemID).name, obj.WStack, TShock.Utils.GetItemById(obj.WItemID).name);
+                                    NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, i);
+                                    NetMessage.SendData((int)PacketTypes.PlayerSlot, args.Player.Index, -1, null, args.Player.Index, i);
+                                    args.Player.SendInfoMessage("Sucess: Trade Completed Successfully! You have gained {0} of {1} for {2} of {3}.", obj.Stack, TShock.Utils.GetItemById(obj.ItemID).Name, obj.WStack, TShock.Utils.GetItemById(obj.WItemID).Name);
                                     return;
                                 }
                                 else
@@ -725,7 +726,7 @@ namespace Shop
                             }
                         }
                         args.Player.SendErrorMessage("Error: Trade could not be completed, you do not have the required item");
-                        args.Player.SendErrorMessage("Error: Required Item - {0}", witem.name);
+                        args.Player.SendErrorMessage("Error: Required Item - {0}", witem.Name);
                         return;
                     }
                     //currency trade
@@ -745,11 +746,11 @@ namespace Shop
                                     TradeList.processTrade(args.Player, obj, witem, wstack);
                                     args.TPlayer.inventory[i].SetDefaults(obj.ItemID);
                                     args.TPlayer.inventory[i].stack = obj.Stack;
-                                    NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, "", args.Player.Index, i);
-                                    NetMessage.SendData((int)PacketTypes.PlayerSlot, args.Player.Index, -1, "", args.Player.Index, i);
-                                    args.Player.SendInfoMessage("Sucess: Item Collected! You have Gained {0} of {1}.", obj.Stack, TShock.Utils.GetItemById(obj.ItemID).name);
+                                    NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, i);;
+                                    NetMessage.SendData((int)PacketTypes.PlayerSlot, args.Player.Index, -1, null, args.Player.Index, i);;
+                                    args.Player.SendInfoMessage("Sucess: Item Collected! You have Gained {0} of {1}.", obj.Stack, TShock.Utils.GetItemById(obj.ItemID).Name);
                                     recived = true;
-                                    eaccount.TransferToAsync(SEconomyPlugin.Instance.WorldAccount, wstack, BankAccountTransferOptions.IsPayment | BankAccountTransferOptions.AnnounceToSender, null, string.Format("Shop Plugin: Traded {0} for {1}", obj.ItemID, ((Money)wstack).ToLongString()));
+                                    eaccount.TransferToAsync(SEconomyPlugin.Instance.WorldAccount, wstack, BankAccountTransferOptions.IsPayment | BankAccountTransferOptions.AnnounceToSender, "Bought an item.", string.Format("Shop Plugin: Traded {0} for {1}", obj.ItemID, ((Money)wstack).ToLongString()));
                                     break;
                                 }
                             }
@@ -784,7 +785,7 @@ namespace Shop
                     foreach (TradeObj obj in TradeList.tradeObj)
                     {
                         if (obj.User == args.Player.Name && obj.Active == 1)
-                            args.Player.SendInfoMessage("{0} - {1} - {2}:{3} - {4}:{5}", obj.ID, obj.User, TShock.Utils.GetItemById(obj.ItemID).name, obj.Stack, TShock.Utils.GetItemById(obj.WItemID).name, obj.WStack);
+                            args.Player.SendInfoMessage("{0} - {1} - {2}:{3} - {4}:{5}", obj.ID, obj.User, TShock.Utils.GetItemById(obj.ItemID).Name, obj.Stack, TShock.Utils.GetItemById(obj.WItemID).Name, obj.WStack);
                     }
                     return;
                 }                    
@@ -817,9 +818,9 @@ namespace Shop
                                         TradeList.processAccept(args.Player, obj);
                                         args.TPlayer.inventory[i].SetDefaults(obj.ItemID);
                                         args.TPlayer.inventory[i].stack = obj.Stack;
-                                        NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, "", args.Player.Index, i);
-                                        NetMessage.SendData((int)PacketTypes.PlayerSlot, args.Player.Index, -1, "", args.Player.Index, i);
-                                        args.Player.SendInfoMessage("Sucess: Item Collected! You have Gained {0} {1}.", obj.Stack, TShock.Utils.GetItemById(obj.ItemID).name);
+                                        NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, i);
+                                        NetMessage.SendData((int)PacketTypes.PlayerSlot, args.Player.Index, -1, null, args.Player.Index, i);
+                                        args.Player.SendInfoMessage("Sucess: Item Collected! You have Gained {0} {1}.", obj.Stack, TShock.Utils.GetItemById(obj.ItemID).Name);
                                         recived = true;
                                         break;
                                     }
@@ -906,7 +907,7 @@ namespace Shop
                         }
                         else
                         {
-                            item = TShock.Utils.GetItemById(obj.ItemID).name;
+                            item = TShock.Utils.GetItemById(obj.ItemID).Name;
                         }
 
                         if (obj.WItemID == 0)
@@ -916,7 +917,7 @@ namespace Shop
                         }
                         else
                         {
-                            witem = TShock.Utils.GetItemById(obj.WItemID).name;
+                            witem = TShock.Utils.GetItemById(obj.WItemID).Name;
                         }
                         args.Player.SendInfoMessage("{0} - {1} - {2}:{3} - {4}:{5}", obj.ID, obj.User, item, obj.Stack, witem, obj.WStack);
                     }
@@ -952,7 +953,7 @@ namespace Shop
             }
             catch (Exception e)
             {
-                Log.ConsoleError(e.ToString());
+                TShock.Log.ConsoleError(e.ToString());
             }
         }
         //shop switch
@@ -1019,7 +1020,7 @@ namespace Shop
                     {
                         return;
                     }
-                    ShopObj obj = ShopList.FindShopObjbyItemName(item.name);
+                    ShopObj obj = ShopList.FindShopObjbyItemName(item.Name);
                     if (obj == null)
                     {
                         args.Player.SendInfoMessage("Info: This item is not listed for sale.");
@@ -1091,7 +1092,7 @@ namespace Shop
             }
             catch (Exception e)
             {
-                Log.ConsoleError(e.ToString());
+                TShock.Log.ConsoleError(e.ToString());
             }
         }
 
@@ -1105,31 +1106,31 @@ namespace Shop
                 return;
             }
             //find item value
-            ShopObj obj = ShopList.FindShopObjbyItemName(item.name);
+            ShopObj obj = ShopList.FindShopObjbyItemName(item.Name);
             if (obj == null)
             {
-                player.SendErrorMessage("Error: This item cannot be Purchased! - {0}", item.name);
+                player.SendErrorMessage("Error: This item cannot be Purchased! - {0}", item.Name);
                 return;
             }
 
             //Check if in stock
             if (obj.Stock == 0)
             {
-                player.SendErrorMessage("Error: No current stock for {0}", item.name);
+                player.SendErrorMessage("Error: No current stock for {0}", item.Name);
                 return;
             }
 
             //Check if there is enough stock
             if (obj.Stock <= stack)
             {
-                player.SendErrorMessage("Error: Not enough stock left for {0} to purchase {1}", item.name, stack);
+                player.SendErrorMessage("Error: Not enough stock left for {0} to purchase {1}", item.Name, stack);
                 return;
             }
 
             //Check if has locked down group permissions
             if (!groupAllowed(player, obj.Group))
             {
-                player.SendErrorMessage("Error: You do not have permissions to purchase {0}", item.name);
+                player.SendErrorMessage("Error: You do not have permissions to purchase {0}", item.Name);
                 return;
             }
 
@@ -1184,7 +1185,7 @@ namespace Shop
             {
                 //All checks completed
                 //Remove money and place in worldaccount
-                account.TransferToAsync(SEconomyPlugin.Instance.WorldAccount, cost, Wolfje.Plugins.SEconomy.Journal.BankAccountTransferOptions.IsPayment, obj.Item, string.Format("Shop: {0} purhcase {1} stack of {2}", player.Name, stack, item.name));
+                account.TransferToAsync(SEconomyPlugin.Instance.WorldAccount, cost, Wolfje.Plugins.SEconomy.Journal.BankAccountTransferOptions.IsPayment, obj.Item, string.Format("Shop: {0} purhcase {1} stack of {2}", player.Name, stack, item.Name));
             }
             else
             {
@@ -1195,13 +1196,24 @@ namespace Shop
 
         private Boolean freeSlots(TSPlayer player, Item item, int itemAmount)
         {
-            if (player.InventorySlotAvailable || (item.name.Contains("Coin") && item.type != 905) || item.type == 58 || item.type == 184)
+            if (player.InventorySlotAvailable || (item.Name.Contains("Coin") && item.type != 905) || item.type == 58 || item.type == 184)
             {
-                if (player.GiveItemCheck(item.type, item.name, item.width, item.height, itemAmount))
+                if (item.prefix == 0)
                 {
-                    return true;
+                    if (player.GiveItemCheck(item.type, item.Name, itemAmount))
+                    {
+                        return true;
+                    }
+                    player.SendErrorMessage("Error: An unknown error has occured - this code should not be reachable!");
                 }
-                player.SendErrorMessage("Error: An unknown error has occured - this code should not be reachable!");
+                else
+                {
+                    if (player.GiveItemCheck(item.type, item.Name, itemAmount, item.prefix))
+                    {
+                        return true;
+                    }
+                    player.SendErrorMessage("Error: An unknown error has occured - this code should not be reachable!");
+                }
                 return false;
             }
             else
@@ -1226,7 +1238,7 @@ namespace Shop
                     }
                     catch (Exception)
                     {
-                        Log.ConsoleError("Shop Plugin: Error cannot locate region - {0}", region);
+                        TShock.Log.ConsoleError("Shop Plugin: Error cannot locate region - {0}", region);
                         return false;
                     }
                 }
@@ -1254,7 +1266,7 @@ namespace Shop
                     }
                     catch (Exception)
                     {
-                        Log.ConsoleError("Shop Plugin: Error cannot locate group - {0}", group);
+                        TShock.Log.ConsoleError("Shop Plugin: Error cannot locate group - {0}", group);
                         return false;
                     }
                 }
@@ -1278,7 +1290,13 @@ namespace Shop
             }
             else if (matchedItems.Count > 1)
             {
-                TShock.Utils.SendMultipleMatchError(player, matchedItems.Select(i => i.name));
+                //TShock.Utils.SendMultipleMatchError(player, matchedItems.Select(i => i.Name));
+                PaginationTools.SendPage(player, 1, matchedItems,
+                        new PaginationTools.Settings
+                        {
+                            HeaderFormat = "Found Multiple Item Match ({0}/{1}):",
+                            NothingToDisplayString = "No items were found."
+                        });
                 return null;
             }
             else
@@ -1306,14 +1324,14 @@ namespace Shop
                 }
                 else
                 {
-                    Log.ConsoleError("Shop config not found. Creating new one");
+                    TShock.Log.ConsoleError("Shop config not found. Creating new one");
                     configObj.Write(filepath);
                     return;
                 }
             }
             catch (Exception ex)
             {
-                Log.ConsoleError(ex.Message);
+                TShock.Log.ConsoleError(ex.Message);
                 return;
             }
         }

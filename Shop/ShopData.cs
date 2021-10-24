@@ -56,7 +56,7 @@ namespace Shop
             }
             catch (Exception e)
             {
-                Log.ConsoleError(e.ToString());
+                TShock.Log.ConsoleError(e.ToString());
             }
         }
         public ShopData(Shop instance)

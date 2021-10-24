@@ -57,7 +57,7 @@ namespace Shop
             {
                 foreach (TradeObj obj in tradeObj)
                 {
-                    if (TShock.Utils.GetItemById(obj.ItemID).name == founditem[0].name)
+                    if (TShock.Utils.GetItemById(obj.ItemID).Name == founditem[0].Name)
                     {
                         foundlist.Add(obj);
                     }
